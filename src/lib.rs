@@ -1,6 +1,6 @@
-use nih_plug::{buffer::ChannelSamples, prelude::*};
+use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
-use std::sync::Arc;
+use std::{f32::consts::PI, sync::Arc};
 
 
 mod editor;
@@ -11,6 +11,9 @@ mod editor;
 
 pub struct SimpleBitcrush {
     params: Arc<SimpleBitcrushParams>,
+    sample_rate: f32,
+    dn_buffer: Vec<f32>,
+    bc_buffer: Vec<f32>,
 }
 
 #[derive(Params)]
@@ -27,12 +30,18 @@ struct SimpleBitcrushParams {
     
     #[id = "rate"]
     pub rate: IntParam,
+    
+    #[id = "cutoff-frequency"]
+    pub cutoff_frequency: FloatParam,
 }
 
 impl Default for SimpleBitcrush {
     fn default() -> Self {
         Self {
             params: Arc::new(SimpleBitcrushParams::default()),
+            sample_rate: 0.0,
+            dn_buffer: Vec::new(),
+            bc_buffer: Vec::new(),
         }
     }
 }
@@ -70,7 +79,23 @@ impl Default for SimpleBitcrushParams {
                 0,
                 IntRange::Linear { min: 1, max: 30 }
             )
-            .with_unit(" sample rate")
+            .with_unit(" sample rate"),
+
+            cutoff_frequency: FloatParam::new(
+                "Cutoff",
+                20000.0,
+                FloatRange::Skewed {
+                    min: 20.0,
+                    max: 20000.0,
+                    // This makes the range appear as if it was linear when displaying the values as
+                    // decibels
+                    factor: 0.25,
+                },
+            )
+            // Because the gain parameter is stored as linear gain instead of storing the value as
+            // decibels, we need logarithmic smoothing
+            .with_smoother(SmoothingStyle::Logarithmic(50.0))
+            
         }
     }
 }
@@ -126,6 +151,15 @@ impl Plugin for SimpleBitcrush {
         // Resize buffers and perform other potentially expensive initialization operations here.
         // The `reset()` function is always called right after this function. You can remove this
         // function if you do not need it.
+        self.sample_rate = _buffer_config.sample_rate;
+        let x: u32 = match _audio_io_layout.main_output_channels {
+            Some(x) => u32::from(x),
+            None => 0,
+        };
+        dbg!(x);
+        dbg!(self.sample_rate);
+        self.dn_buffer = vec![0.0;x as usize];
+        self.bc_buffer = vec![0.0;x as usize];
         true
     }
 
@@ -148,36 +182,42 @@ impl Plugin for SimpleBitcrush {
         _context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         
-        let mut previous_sample: Option<ChannelSamples> = None;
+        //dbg!(buffer.channels());
+        //dbg!(self.dn_buffer.len());
+        //let mut previous_sample: Option<ChannelSamples> = None;
+        
+        
         for (idx, channel_samples) in buffer.iter_samples().enumerate() {
             // Smoothing is optionally built into the parameters themselves
-            let gain = self.params.gain.smoothed.next();
+            //let gain = self.params.gain.smoothed.next();
             let rate = self.params.rate.smoothed.next();
+            let cutoff = self.params.cutoff_frequency.smoothed.next();
+
             
-            dbg!(idx);
+            let tan = 0.1 * f32::tan(PI * cutoff / self.sample_rate);
+            let  a1 = (tan - 1.0) / (tan + 1.0);
+            
+            for (i, sample) in channel_samples.into_iter().enumerate() {
+                if rate > 1 {
 
-            if rate > 1 {
-                dbg!(rate);
-                dbg!(idx);
-
-                if (idx as i32) % rate == 0 {
-                    previous_sample = Some(channel_samples);
-                } else {
-                    
-                    match previous_sample {
-                        None => {},
-                        Some(ref mut channel_sample) => {
-                                                //let mut sample_index = 0;
-                            for (i, sample) in channel_samples.into_iter().enumerate() {
-                                *sample = match channel_sample.get_mut(i) {
-                                    Some(smpl) => *smpl,
-                                    None => *sample,
-                                }
-                            }
-                        }
+                    if (idx as i32) % rate == 0 {
+                        
+                        self.bc_buffer[i] = *sample;
+                    } else {
+                        *sample = self.bc_buffer[i];
+                        
                     }
                 }
+    
+                    let allpass_filtered_sample = a1 * *sample + self.dn_buffer[i];
+                    self.dn_buffer[i] = *sample - a1 * allpass_filtered_sample;
+                    //dbg!(allpass_filtered_sample);
+    
+                    let filter_output = 0.5 * (*sample + 1.0 * allpass_filtered_sample);
+                    
+                    *sample = filter_output;
             }
+            
         }
         ProcessStatus::Normal
     }
