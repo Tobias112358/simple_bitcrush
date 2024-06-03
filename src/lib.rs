@@ -33,9 +33,14 @@ struct SimpleBitcrushParams {
     
     #[id = "cutoff-frequency"]
     pub cutoff_frequency: FloatParam,
+    #[id = "highpass"]
+    pub highpass: BoolParam,
     
     #[id = "wet"]
     pub wet: FloatParam,
+
+    #[id = "slope"]
+    pub slope: FloatParam,
 }
 
 impl Default for SimpleBitcrush {
@@ -98,12 +103,25 @@ impl Default for SimpleBitcrushParams {
             // Because the gain parameter is stored as linear gain instead of storing the value as
             // decibels, we need logarithmic smoothing
             .with_smoother(SmoothingStyle::Logarithmic(50.0)),
+            highpass: BoolParam::new(
+                "Highpass",
+                false
+            ),
             wet: FloatParam::new(
                 "Wet",
                 1.0,
                 FloatRange::Linear{
                     min: 0.0,
                     max: 1.0
+                },
+            ),
+            slope: FloatParam::new(
+                "Sploe",
+                1.0,
+                FloatRange::Skewed {
+                    min: 0.001,
+                    max: 5.0,
+                    factor: 1.0
                 },
             )
             
@@ -197,6 +215,9 @@ impl Plugin for SimpleBitcrush {
         //dbg!(self.dn_buffer.len());
         //let mut previous_sample: Option<ChannelSamples> = None;
         
+        let highpass = self.params.highpass.value();
+        let sign = if highpass { -1.0 } else { 1.0 };
+        dbg!(sign);
         
         for (idx, channel_samples) in buffer.iter_samples().enumerate() {
             // Smoothing is optionally built into the parameters themselves
@@ -204,9 +225,10 @@ impl Plugin for SimpleBitcrush {
             let rate = self.params.rate.smoothed.next();
             let cutoff = self.params.cutoff_frequency.smoothed.next();
             let wet = self.params.wet.smoothed.next();
+            let slope = self.params.slope.smoothed.next();
 
             
-            let tan = 0.1 * f32::tan(PI * cutoff / self.sample_rate);
+            let tan = slope * f32::tan(PI * cutoff / self.sample_rate);
             let  a1 = (tan - 1.0) / (tan + 1.0);
             
             for (i, sample) in channel_samples.into_iter().enumerate() {
@@ -221,15 +243,15 @@ impl Plugin for SimpleBitcrush {
                     }
                 }
     
-                    let allpass_filtered_sample = a1 * *sample + self.dn_buffer[i];
-                    self.dn_buffer[i] = *sample - a1 * allpass_filtered_sample;
-                    //dbg!(allpass_filtered_sample);
-    
-                    let filter_output = 0.5 * (*sample + 1.0 * allpass_filtered_sample);
-                    
-                    *sample = filter_output;
+                let allpass_filtered_sample = a1 * *sample + self.dn_buffer[i];
+                self.dn_buffer[i] = *sample - a1 * allpass_filtered_sample;
+                //dbg!(allpass_filtered_sample);
 
-                    *sample = (dry_sample * ((0.0-wet)+1.0)) + (*sample * wet);
+                let filter_output = 0.5 * (*sample + sign * allpass_filtered_sample);
+                
+                *sample = filter_output;
+
+                *sample = (dry_sample * ((0.0-wet)+1.0)) + (*sample * wet);
             }
             
         }

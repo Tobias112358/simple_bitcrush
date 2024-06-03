@@ -89,6 +89,18 @@ pub(crate) fn create(
             .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
             .font_weight(FontWeightKeyword::Light);
 
+            Label::new(cx, "Highpass?")
+            .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
+            .font_size(20.0)
+            .color(RGBA::rgb(235, 225,255))
+            .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
+            .font_weight(FontWeightKeyword::SemiBold);
+            ParamButton::new(cx, Data::params, |params| &params.highpass)
+            .border_color(RGBA::rgb(123,133,230))
+            .background_color(RGBA::rgb(73,83,130))
+            .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
+            .font_weight(FontWeightKeyword::Light);
+
         
             Label::new(cx, "Wet/Dry")
             .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
@@ -97,6 +109,19 @@ pub(crate) fn create(
             .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
             .font_weight(FontWeightKeyword::SemiBold);
             ParamSlider::new(cx, Data::params, |params| &params.wet)
+            .border_color(RGBA::rgb(123,133,230))
+            .background_color(RGBA::rgb(73,83,130))
+            .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
+            .font_weight(FontWeightKeyword::Light);
+        
+        
+            Label::new(cx, "Cutoff Slope")
+            .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
+            .font_size(20.0)
+            .color(RGBA::rgb(235, 225,255))
+            .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
+            .font_weight(FontWeightKeyword::SemiBold);
+            ParamSlider::new(cx, Data::params, |params| &params.slope)
             .border_color(RGBA::rgb(123,133,230))
             .background_color(RGBA::rgb(73,83,130))
             .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
