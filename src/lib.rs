@@ -33,6 +33,9 @@ struct SimpleBitcrushParams {
     
     #[id = "cutoff-frequency"]
     pub cutoff_frequency: FloatParam,
+    
+    #[id = "wet"]
+    pub wet: FloatParam,
 }
 
 impl Default for SimpleBitcrush {
@@ -94,7 +97,15 @@ impl Default for SimpleBitcrushParams {
             )
             // Because the gain parameter is stored as linear gain instead of storing the value as
             // decibels, we need logarithmic smoothing
-            .with_smoother(SmoothingStyle::Logarithmic(50.0))
+            .with_smoother(SmoothingStyle::Logarithmic(50.0)),
+            wet: FloatParam::new(
+                "Wet",
+                1.0,
+                FloatRange::Linear{
+                    min: 0.0,
+                    max: 1.0
+                },
+            )
             
         }
     }
@@ -192,12 +203,14 @@ impl Plugin for SimpleBitcrush {
             //let gain = self.params.gain.smoothed.next();
             let rate = self.params.rate.smoothed.next();
             let cutoff = self.params.cutoff_frequency.smoothed.next();
+            let wet = self.params.wet.smoothed.next();
 
             
             let tan = 0.1 * f32::tan(PI * cutoff / self.sample_rate);
             let  a1 = (tan - 1.0) / (tan + 1.0);
             
             for (i, sample) in channel_samples.into_iter().enumerate() {
+                let dry_sample = sample.clone();
                 if rate > 1 {
 
                     if (idx as i32) % rate == 0 {
@@ -205,7 +218,6 @@ impl Plugin for SimpleBitcrush {
                         self.bc_buffer[i] = *sample;
                     } else {
                         *sample = self.bc_buffer[i];
-                        
                     }
                 }
     
@@ -216,6 +228,8 @@ impl Plugin for SimpleBitcrush {
                     let filter_output = 0.5 * (*sample + 1.0 * allpass_filtered_sample);
                     
                     *sample = filter_output;
+
+                    *sample = (dry_sample * ((0.0-wet)+1.0)) + (*sample * wet);
             }
             
         }

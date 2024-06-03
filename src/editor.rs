@@ -88,6 +88,19 @@ pub(crate) fn create(
             .background_color(RGBA::rgb(73,83,130))
             .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
             .font_weight(FontWeightKeyword::Light);
+
+        
+            Label::new(cx, "Wet/Dry")
+            .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
+            .font_size(20.0)
+            .color(RGBA::rgb(235, 225,255))
+            .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
+            .font_weight(FontWeightKeyword::SemiBold);
+            ParamSlider::new(cx, Data::params, |params| &params.wet)
+            .border_color(RGBA::rgb(123,133,230))
+            .background_color(RGBA::rgb(73,83,130))
+            .font_family(vec![FamilyOwned::Name(String::from(my_assets::RED_ROSE))])
+            .font_weight(FontWeightKeyword::Light);
         })
         .row_between(Pixels(0.0))
         .child_left(Stretch(1.0))
